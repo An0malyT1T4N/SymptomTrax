@@ -1,0 +1,732 @@
+```html
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>Care & Health Log</title>
+    
+    <!-- iOS PWA Capabilities -->
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="apple-mobile-web-app-title" content="Care Tracker">
+    <meta name="theme-color" content="#fff1f2">
+
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        rose: {
+                            50: '#fff1f2',
+                            100: '#ffe4e6',
+                            200: '#fecdd3',
+                            300: '#fda4af',
+                            400: '#fb7185',
+                            500: '#f43f5e',
+                            600: '#e11d48',
+                        },
+                        teal: {
+                            50: '#f0fdfa',
+                            100: '#ccfbf1',
+                            500: '#14b8a6',
+                            600: '#0d9488',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <!-- Lucide Icons & Chart.js -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <!-- Dynamic PWA Manifest -->
+    <script>
+        const manifest = {
+            "name": "Care & Health Log",
+            "short_name": "Care Track",
+            "start_url": "./",
+            "display": "standalone",
+            "background_color": "#fff1f2",
+            "theme_color": "#f43f5e",
+            "icons": [
+                {
+                    "src": "https://img.icons8.com/isometric-folders/512/heart-health.png",
+                    "sizes": "512x512",
+                    "type": "image/png"
+                }
+            ]
+        };
+        const blob = new Blob([JSON.stringify(manifest)], {type: 'application/json'});
+        const link = document.createElement('link');
+        link.rel = 'manifest';
+        link.href = URL.createObjectURL(blob);
+        document.head.appendChild(link);
+    </script>
+
+    <style>
+        -webkit-tap-highlight-color: transparent;
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            user-select: none;
+            -webkit-user-select: none;
+            background-color: #fff1f2;
+        }
+        .hide-scrollbar::-webkit-scrollbar { display: none; }
+        .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+        
+        /* Print styles for Doctor Report */
+        @media print {
+            nav, header, .no-print { display: none !important; }
+            body { background: white !important; color: black !important; }
+            .print-only { display: block !important; }
+            .page-break { page-break-after: always; }
+        }
+    </style>
+</head>
+<body class="text-slate-800 min-h-screen pb-28 pt-safe">
+
+    <!-- iOS Banner for Home Screen installation -->
+    <div id="iosInstallPrompt" class="hidden bg-rose-500 text-white p-3 text-xs flex items-center justify-between border-b border-rose-600 shadow-md sticky top-0 z-50 no-print">
+        <div class="flex items-center space-x-2">
+            <i data-lucide="share" class="w-4 h-4 text-rose-100"></i>
+            <span>Tap <b>Share</b> then <b>'Add to Home Screen'</b> to install!</span>
+        </div>
+        <button onclick="dismissPrompt()" class="text-rose-200 hover:text-white p-1">
+            <i data-lucide="x" class="w-4 h-4"></i>
+        </button>
+    </div>
+
+    <!-- Main Container -->
+    <main class="max-w-md mx-auto px-4 pt-4">
+
+        <!-- Top Header -->
+        <header class="flex items-center justify-between mb-5 no-print">
+            <div>
+                <h1 class="text-2xl font-bold text-slate-900 flex items-center gap-2">
+                    <span>Care Log</span>
+                    <span class="text-xs px-2 py-0.5 rounded-full bg-rose-100 text-rose-600 font-semibold border border-rose-200">Personal</span>
+                </h1>
+                <p class="text-xs text-slate-500" id="currentDateStr"></p>
+            </div>
+            <div class="w-10 h-10 rounded-full bg-rose-200 flex items-center justify-center text-rose-600 shadow-inner">
+                <i data-lucide="heart-pulse" class="w-5 h-5"></i>
+            </div>
+        </header>
+
+        <!-- VIEW 1: NEW LOG ENTRY -->
+        <section id="viewLog" class="space-y-4">
+
+            <!-- Global Time & Date Header for Entry -->
+            <div class="bg-white/90 backdrop-blur border border-rose-100 rounded-2xl p-4 shadow-sm space-y-3">
+                <div class="flex items-center justify-between">
+                    <label class="text-xs font-bold text-rose-600 uppercase tracking-wider flex items-center gap-1.5">
+                        <i data-lucide="calendar" class="w-4 h-4"></i>
+                        <span>Entry Date & Time</span>
+                    </label>
+                    <button onclick="setNowTime()" class="text-[11px] font-semibold text-teal-600 bg-teal-50 px-2.5 py-1 rounded-lg border border-teal-200 hover:bg-teal-100">
+                        Reset to Now
+                    </button>
+                </div>
+                <div class="grid grid-cols-2 gap-2">
+                    <input type="date" id="entryDate" class="bg-slate-50 border border-slate-200 rounded-xl p-2.5 text-xs text-slate-700 focus:outline-none focus:border-rose-400">
+                    <input type="time" id="entryTime" class="bg-slate-50 border border-slate-200 rounded-xl p-2.5 text-xs text-slate-700 focus:outline-none focus:border-rose-400">
+                </div>
+            </div>
+
+            <!-- Search & Quick Filter -->
+            <div class="relative">
+                <i data-lucide="search" class="w-4 h-4 text-slate-400 absolute left-3.5 top-3"></i>
+                <input type="text" id="symptomSearch" oninput="filterSymptoms(this.value)" placeholder="Search symptoms (e.g., hot flash, arm swelling, nausea)..." class="w-full bg-white border border-rose-200 rounded-2xl pl-10 pr-4 py-2.5 text-xs text-slate-700 placeholder-slate-400 shadow-sm focus:outline-none focus:border-rose-400">
+            </div>
+
+            <!-- SYMPTOM CATEGORIES CONTAINERS -->
+            <div id="categoriesContainer" class="space-y-3">
+                <!-- Categories rendered dynamically -->
+            </div>
+
+            <!-- Global Notes Section -->
+            <div class="bg-white/90 backdrop-blur border border-rose-100 rounded-2xl p-4 shadow-sm">
+                <label class="text-xs font-bold text-slate-600 uppercase tracking-wider flex items-center gap-1.5 mb-2">
+                    <i data-lucide="file-text" class="w-4 h-4"></i>
+                    <span>Overall Daily Observations / Context Notes</span>
+                </label>
+                <textarea id="globalNotes" rows="3" class="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-xs text-slate-700 focus:outline-none focus:border-rose-400 transition resize-none" placeholder="General context (e.g. food eaten, doctor visit notes, weather changes, general fatigue levels)..."></textarea>
+            </div>
+
+            <!-- Save Entry Button -->
+            <button onclick="saveLogEntry()" class="w-full py-4 bg-rose-500 hover:bg-rose-600 text-white font-bold text-sm rounded-2xl shadow-lg shadow-rose-500/25 flex items-center justify-center gap-2 active:scale-98 transition">
+                <i data-lucide="check-circle" class="w-5 h-5"></i>
+                <span>Save Entry & Symptoms</span>
+            </button>
+
+        </section>
+
+        <!-- VIEW 2: HISTORY -->
+        <section id="viewHistory" class="space-y-4 hidden">
+            <div class="flex items-center justify-between bg-white border border-rose-100 p-3 rounded-2xl shadow-sm">
+                <span class="text-xs text-slate-600 font-medium">Logged Entries: <b id="totalLogsCount">0</b></span>
+                <div class="flex gap-2">
+                    <button onclick="window.print()" class="text-xs bg-teal-50 text-teal-700 border border-teal-200 px-2.5 py-1.5 rounded-lg font-medium flex items-center gap-1">
+                        <i data-lucide="printer" class="w-3.5 h-3.5"></i> Print Report
+                    </button>
+                    <button onclick="exportCSV()" class="text-xs bg-rose-50 text-rose-600 border border-rose-200 px-2 py-1.5 rounded-lg font-medium flex items-center gap-1">
+                        <i data-lucide="file-spreadsheet" class="w-3.5 h-3.5"></i> CSV
+                    </button>
+                    <button onclick="exportJSON()" class="text-xs bg-slate-100 text-slate-700 border border-slate-200 px-2 py-1.5 rounded-lg font-medium flex items-center gap-1">
+                        <i data-lucide="download" class="w-3.5 h-3.5"></i> JSON
+                    </button>
+                </div>
+            </div>
+            <div id="historyList" class="space-y-3"></div>
+        </section>
+
+        <!-- VIEW 3: MEDICATIONS -->
+        <section id="viewMeds" class="space-y-4 hidden">
+            <div class="bg-white border border-rose-100 rounded-2xl p-4 shadow-sm">
+                <h2 class="text-sm font-bold text-slate-800 mb-3 flex items-center gap-2">
+                    <i data-lucide="plus-circle" class="w-4 h-4 text-rose-500"></i>
+                    <span>Add New Medication / Supplement</span>
+                </h2>
+                <div class="space-y-2">
+                    <input type="text" id="medName" placeholder="Medication Name (e.g. Tamoxifen, Letrozole, Anastrozole)" class="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5 text-xs">
+                    <div class="grid grid-cols-2 gap-2">
+                        <input type="text" id="medDosage" placeholder="Dosage (e.g. 20mg)" class="bg-slate-50 border border-slate-200 rounded-xl p-2.5 text-xs">
+                        <input type="time" id="medTime" class="bg-slate-50 border border-slate-200 rounded-xl p-2.5 text-xs">
+                    </div>
+                    <button onclick="addMedication()" class="w-full py-2.5 bg-rose-500 text-white rounded-xl text-xs font-semibold shadow-sm">Save Medication</button>
+                </div>
+            </div>
+
+            <div class="bg-white border border-rose-100 rounded-2xl p-4 shadow-sm">
+                <h3 class="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3">Saved Schedule</h3>
+                <div id="medsList" class="space-y-2"></div>
+            </div>
+        </section>
+
+        <!-- VIEW 4: INSIGHTS -->
+        <section id="viewInsights" class="space-y-4 hidden">
+            <div class="bg-white border border-rose-100 rounded-2xl p-4 shadow-sm">
+                <h3 class="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Pain & Symptom Trends (Past 7 Days)</h3>
+                <canvas id="trendChart" height="200"></canvas>
+            </div>
+            <div class="bg-white border border-rose-100 rounded-2xl p-4 shadow-sm">
+                <h3 class="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Most Frequently Logged Symptoms</h3>
+                <div id="frequentSymptoms" class="space-y-2 text-xs"></div>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- Bottom Navigation Bar -->
+    <nav class="fixed bottom-0 left-0 right-0 bg-white/95 backdrop-blur border-t border-rose-100 px-6 py-2 flex justify-around items-center z-40 max-w-md mx-auto no-print">
+        <button onclick="switchTab('log')" id="nav-log" class="flex flex-col items-center gap-1 text-rose-600">
+            <i data-lucide="edit-3" class="w-5 h-5"></i>
+            <span class="text-[10px] font-medium">Log</span>
+        </button>
+        <button onclick="switchTab('history')" id="nav-history" class="flex flex-col items-center gap-1 text-slate-400">
+            <i data-lucide="clock" class="w-5 h-5"></i>
+            <span class="text-[10px] font-medium">History</span>
+        </button>
+        <button onclick="switchTab('meds')" id="nav-meds" class="flex flex-col items-center gap-1 text-slate-400">
+            <i data-lucide="pill" class="w-5 h-5"></i>
+            <span class="text-[10px] font-medium">Meds</span>
+        </button>
+        <button onclick="switchTab('insights')" id="nav-insights" class="flex flex-col items-center gap-1 text-slate-400">
+            <i data-lucide="line-chart" class="w-5 h-5"></i>
+            <span class="text-[10px] font-medium">Insights</span>
+        </button>
+    </nav>
+
+    <!-- Toast Banner -->
+    <div id="toast" class="fixed bottom-20 left-1/2 -translate-x-1/2 bg-slate-900 text-white px-4 py-2.5 rounded-full shadow-lg text-xs font-medium flex items-center gap-2 opacity-0 pointer-events-none transition-all duration-300 z-50 no-print">
+        <i data-lucide="check" class="w-4 h-4 text-emerald-400"></i>
+        <span id="toastMsg">Saved</span>
+    </div>
+
+    <script>
+        // Comprehensive master list of symptoms across recovery categories
+        const SYMPTOM_CATEGORIES = [
+            {
+                id: 'surgical_lymphedema',
+                title: 'Surgical, Mastectomy & Lymphedema',
+                icon: 'shield-alert',
+                color: 'text-indigo-600',
+                border: 'border-indigo-100',
+                items: [
+                    'Surgical Site Pain', 'Chest Wall Tightness', 'Lymphedema / Arm Swelling',
+                    'Hand/Finger Swelling', 'Surgical Drain Pain', 'Surgical Drain High Volume Output',
+                    'Seroma / Fluid Collection', 'Restricted Shoulder/Arm Motion', 'Phantom Breast Pain',
+                    'Numbness / Tingling (Chest/Arm)', 'Cording / Axillary Web Syndrome', 'Incision Redness or Warmth'
+                ]
+            },
+            {
+                id: 'menopause_hormonal',
+                title: 'Menopause & Endocrine Therapy',
+                icon: 'flame',
+                color: 'text-amber-600',
+                border: 'border-amber-100',
+                items: [
+                    'Hot Flashes', 'Night Sweats', 'Chills / Cold Sweats', 'Sleep Disturbance / Insomnia',
+                    'Brain Fog / Memory Loss', 'Vaginal Dryness / Discomfort', 'Low Libido',
+                    'Weight Changes / Bloating', 'Hair Thinning / Loss', 'Dry Skin or Itching'
+                ]
+            },
+            {
+                id: 'body_pain',
+                title: 'Body Pain & Joint Stiffness',
+                icon: 'activity',
+                color: 'text-rose-600',
+                border: 'border-rose-100',
+                items: [
+                    'Joint Stiffness (Aromatase Inhibitor side effect)', 'Right Leg Pain', 'Left Leg Pain',
+                    'Right Hand Pain', 'Left Hand Pain', 'Right Wrist Pain', 'Left Wrist Pain',
+                    'Left Knee Pain', 'Right Knee Pain', 'Hip Pain', 'Lower Back Pain', 'Upper Back Pain',
+                    'Right Shoulder Pain', 'Left Shoulder Pain', 'Neuropathy (Tingling Hands/Feet)', 'Bone Aches'
+                ]
+            },
+            {
+                id: 'digestive_systemic',
+                title: 'Digestive & Systemic',
+                icon: 'pill',
+                color: 'text-emerald-600',
+                border: 'border-emerald-100',
+                items: [
+                    'Nausea', 'Vomiting', 'Constipation', 'Diarrhea', 'Loss of Appetite',
+                    'Heartburn / Acid Reflux', 'Extreme Fatigue', 'Dizziness / Lightheadedness',
+                    'Headache', 'Shortness of Breath', 'Palpitations'
+                ]
+            },
+            {
+                id: 'mood_cognitive',
+                title: 'Mood & Emotional Wellbeing',
+                icon: 'smile',
+                color: 'text-purple-600',
+                border: 'border-purple-100',
+                items: [
+                    'Anxiety', 'Depressed Mood', 'Irritability', 'Emotional Mood Swings',
+                    'Overwhelmed Feeling', 'Restlessness', 'Hopeful / Good Energy'
+                ]
+            }
+        ];
+
+        // State storage
+        const state = {
+            logs: [],
+            medications: [],
+            // Keyed object to store checked states, time, severity, and individual notes
+            // e.g. { "Hot Flashes": { checked: true, time: "14:30", severity: "Moderate", note: "Lasted 15 mins" } }
+            activeSymptoms: {}
+        };
+
+        window.addEventListener('DOMContentLoaded', () => {
+            lucide.createIcons();
+            initHeaderDate();
+            setNowTime();
+            renderCategoryContainers();
+            loadStorage();
+            checkIOS();
+        });
+
+        function checkIOS() {
+            const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+            const isStandalone = window.navigator.standalone || window.matchMedia('(display-mode: standalone)').matches;
+            if (isIOS && !isStandalone) document.getElementById('iosInstallPrompt').classList.remove('hidden');
+        }
+        function dismissPrompt() { document.getElementById('iosInstallPrompt').classList.add('hidden'); }
+
+        function initHeaderDate() {
+            document.getElementById('currentDateStr').innerText = new Date().toLocaleDateString(undefined, { weekday: 'long', month: 'short', day: 'numeric', year: 'numeric' });
+        }
+
+        function setNowTime() {
+            const now = new Date();
+            document.getElementById('entryDate').value = now.toISOString().split('T')[0];
+            document.getElementById('entryTime').value = now.toTimeString().slice(0,5);
+        }
+
+        function getCurrentTimeStr() {
+            return new Date().toTimeString().slice(0,5);
+        }
+
+        // Render Expandable Categories & Symptoms
+        function renderCategoryContainers() {
+            const container = document.getElementById('categoriesContainer');
+            container.innerHTML = SYMPTOM_CATEGORIES.map(cat => `
+                <div class="bg-white/90 backdrop-blur border ${cat.border} rounded-2xl overflow-hidden shadow-sm transition-all" id="cat-card-${cat.id}">
+                    <button type="button" onclick="toggleCategoryAccordion('${cat.id}')" class="w-full p-4 flex items-center justify-between text-left bg-slate-50/50 hover:bg-slate-50 transition">
+                        <div class="flex items-center gap-2">
+                            <i data-lucide="${cat.icon}" class="w-4 h-4 ${cat.color}"></i>
+                            <span class="text-xs font-bold text-slate-800 uppercase tracking-wider">${cat.title}</span>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <span class="text-[10px] font-semibold text-rose-500 bg-rose-50 px-2 py-0.5 rounded-full hidden" id="badge-${cat.id}">0 selected</span>
+                            <i data-lucide="chevron-down" class="w-4 h-4 text-slate-400 transition-transform duration-200" id="arrow-${cat.id}"></i>
+                        </div>
+                    </button>
+
+                    <div id="body-${cat.id}" class="p-3 pt-0 space-y-2 border-t border-slate-100">
+                        ${cat.items.map(item => renderSymptomRow(item, cat.id)).join('')}
+                    </div>
+                </div>
+            `).join('');
+            lucide.createIcons();
+        }
+
+        function renderSymptomRow(item, catId) {
+            const safeId = item.replace(/[^a-zA-Z0-9]/g, '_');
+            const defaultTime = getCurrentTimeStr();
+            return `
+                <div class="border border-slate-100 bg-slate-50/50 rounded-xl p-3 transition" id="row-${safeId}">
+                    <div class="flex items-start justify-between gap-2">
+                        <label class="flex items-center gap-2.5 cursor-pointer flex-1 py-1">
+                            <input type="checkbox" id="chk-${safeId}" onchange="toggleSymptom('${item}', '${catId}', '${safeId}')" class="w-4 h-4 accent-rose-500 rounded border-slate-300">
+                            <span class="text-xs font-medium text-slate-700">${item}</span>
+                        </label>
+                    </div>
+
+                    <!-- Expandable Detail Controls when Checked -->
+                    <div id="details-${safeId}" class="hidden mt-2.5 pt-2.5 border-t border-slate-200/60 space-y-2">
+                        <div class="grid grid-cols-2 gap-2">
+                            <div>
+                                <label class="text-[10px] font-semibold text-slate-500 block mb-1">Time of Occurrence</label>
+                                <input type="time" id="time-${safeId}" value="${defaultTime}" onchange="updateSymptomDetail('${item}', 'time', this.value)" class="w-full bg-white border border-slate-200 rounded-lg p-1.5 text-xs text-slate-700">
+                            </div>
+                            <div>
+                                <label class="text-[10px] font-semibold text-slate-500 block mb-1">Severity / Intensity</label>
+                                <select id="sev-${safeId}" onchange="updateSymptomDetail('${item}', 'severity', this.value)" class="w-full bg-white border border-slate-200 rounded-lg p-1.5 text-xs text-slate-700">
+                                    <option value="Mild">Mild</option>
+                                    <option value="Moderate" selected>Moderate</option>
+                                    <option value="Severe">Severe</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div>
+                            <label class="text-[10px] font-semibold text-slate-500 block mb-1">Symptom Note</label>
+                            <input type="text" id="note-${safeId}" oninput="updateSymptomDetail('${item}', 'note', this.value)" placeholder="Specific note for ${item}..." class="w-full bg-white border border-slate-200 rounded-lg p-2 text-xs text-slate-700 focus:outline-none focus:border-rose-400">
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        function toggleCategoryAccordion(catId) {
+            const body = document.getElementById(`body-${catId}`);
+            const arrow = document.getElementById(`arrow-${catId}`);
+            body.classList.toggle('hidden');
+            arrow.classList.toggle('rotate-180');
+        }
+
+        function toggleSymptom(item, catId, safeId) {
+            const isChecked = document.getElementById(`chk-${safeId}`).checked;
+            const detailsDiv = document.getElementById(`details-${safeId}`);
+            const rowDiv = document.getElementById(`row-${safeId}`);
+
+            if (isChecked) {
+                detailsDiv.classList.remove('hidden');
+                rowDiv.classList.add('bg-rose-50/60', 'border-rose-200');
+
+                state.activeSymptoms[item] = {
+                    checked: true,
+                    category: catId,
+                    time: document.getElementById(`time-${safeId}`).value || getCurrentTimeStr(),
+                    severity: document.getElementById(`sev-${safeId}`).value || 'Moderate',
+                    note: document.getElementById(`note-${safeId}`).value || ''
+                };
+            } else {
+                detailsDiv.classList.add('hidden');
+                rowDiv.classList.remove('bg-rose-50/60', 'border-rose-200');
+                delete state.activeSymptoms[item];
+            }
+            updateCategoryBadges();
+        }
+
+        function updateSymptomDetail(item, field, value) {
+            if (state.activeSymptoms[item]) {
+                state.activeSymptoms[item][field] = value;
+            }
+        }
+
+        function updateCategoryBadges() {
+            SYMPTOM_CATEGORIES.forEach(cat => {
+                const count = Object.values(state.activeSymptoms).filter(s => s.category === cat.id).length;
+                const badge = document.getElementById(`badge-${cat.id}`);
+                if (badge) {
+                    if (count > 0) {
+                        badge.innerText = `${count} selected`;
+                        badge.classList.remove('hidden');
+                    } else {
+                        badge.classList.add('hidden');
+                    }
+                }
+            });
+        }
+
+        function filterSymptoms(query) {
+            const q = query.toLowerCase().trim();
+            SYMPTOM_CATEGORIES.forEach(cat => {
+                let matchInCat = false;
+                cat.items.forEach(item => {
+                    const safeId = item.replace(/[^a-zA-Z0-9]/g, '_');
+                    const row = document.getElementById(`row-${safeId}`);
+                    if (!q || item.toLowerCase().includes(q)) {
+                        row.classList.remove('hidden');
+                        matchInCat = true;
+                    } else {
+                        row.classList.add('hidden');
+                    }
+                });
+
+                // Auto open category if search query matches items in it
+                if (q && matchInCat) {
+                    document.getElementById(`body-${cat.id}`).classList.remove('hidden');
+                    document.getElementById(`arrow-${cat.id}`).classList.add('rotate-180');
+                }
+            });
+        }
+
+        // Navigation
+        function switchTab(tab) {
+            ['log', 'history', 'meds', 'insights'].forEach(t => {
+                document.getElementById(`view${t.charAt(0).toUpperCase() + t.slice(1)}`).classList.add('hidden');
+                document.getElementById(`nav-${t}`).classList.remove('text-rose-600');
+                document.getElementById(`nav-${t}`).classList.add('text-slate-400');
+            });
+
+            document.getElementById(`view${tab.charAt(0).toUpperCase() + tab.slice(1)}`).classList.remove('hidden');
+            document.getElementById(`nav-${tab}`).classList.add('text-rose-600');
+            document.getElementById(`nav-${tab}`).classList.remove('text-slate-400');
+
+            if (tab === 'history') renderHistory();
+            if (tab === 'meds') renderMeds();
+            if (tab === 'insights') renderInsights();
+        }
+
+        // Persistence
+        function saveLogEntry() {
+            const dateVal = document.getElementById('entryDate').value;
+            const timeVal = document.getElementById('entryTime').value;
+            const globalNotes = document.getElementById('globalNotes').value.trim();
+
+            const loggedSymptomsList = Object.entries(state.activeSymptoms).map(([name, data]) => ({
+                name,
+                time: data.time,
+                severity: data.severity,
+                note: data.note
+            }));
+
+            if (loggedSymptomsList.length === 0 && !globalNotes) {
+                showToast("Please check at least one symptom or enter a note!");
+                return;
+            }
+
+            const entry = {
+                id: Date.now(),
+                date: dateVal,
+                time: timeVal,
+                displayDate: `${dateVal} at ${timeVal}`,
+                symptoms: loggedSymptomsList,
+                globalNotes: globalNotes
+            };
+
+            state.logs.unshift(entry);
+            localStorage.setItem('care_logs', JSON.stringify(state.logs));
+            showToast("Log entry saved successfully!");
+            resetForm();
+        }
+
+        function resetForm() {
+            state.activeSymptoms = {};
+            document.getElementById('globalNotes').value = '';
+            document.getElementById('symptomSearch').value = '';
+            filterSymptoms('');
+            renderCategoryContainers();
+            setNowTime();
+        }
+
+        function loadStorage() {
+            state.logs = JSON.parse(localStorage.getItem('care_logs') || '[]');
+            state.medications = JSON.parse(localStorage.getItem('care_meds') || '[]');
+        }
+
+        function renderHistory() {
+            document.getElementById('totalLogsCount').innerText = state.logs.length;
+            const container = document.getElementById('historyList');
+
+            if (state.logs.length === 0) {
+                container.innerHTML = `<div class="text-center py-8 text-xs text-slate-400 bg-white rounded-2xl border border-rose-100">No health logs created yet.</div>`;
+                return;
+            }
+
+            container.innerHTML = state.logs.map(log => `
+                <div class="bg-white border border-rose-100 rounded-2xl p-4 shadow-sm space-y-3 text-xs">
+                    <div class="flex items-center justify-between border-b border-slate-100 pb-2">
+                        <span class="font-bold text-slate-800 flex items-center gap-1.5">
+                            <i data-lucide="clock" class="w-3.5 h-3.5 text-rose-500"></i>
+                            ${log.displayDate}
+                        </span>
+                        <button onclick="deleteLog(${log.id})" class="text-slate-400 hover:text-rose-500"><i data-lucide="trash-2" class="w-3.5 h-3.5"></i></button>
+                    </div>
+
+                    ${log.symptoms.length > 0 ? `
+                        <div class="space-y-1.5">
+                            <span class="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Logged Symptoms:</span>
+                            <div class="space-y-1">
+                                ${log.symptoms.map(s => `
+                                    <div class="bg-slate-50 p-2 rounded-xl border border-slate-100 flex flex-col gap-0.5">
+                                        <div class="flex items-center justify-between">
+                                            <span class="font-semibold text-slate-700">${s.name}</span>
+                                            <div class="flex items-center gap-2 text-[10px]">
+                                                <span class="text-rose-600 font-bold bg-rose-50 px-1.5 py-0.5 rounded border border-rose-200">${s.severity}</span>
+                                                <span class="text-slate-400">${s.time}</span>
+                                            </div>
+                                        </div>
+                                        ${s.note ? `<p class="text-[11px] text-slate-500 italic mt-0.5">Note: "${s.note}"</p>` : ''}
+                                    </div>
+                                `).join('')}
+                            </div>
+                        </div>
+                    ` : '<p class="text-slate-400 italic">No specific symptoms checked.</p>'}
+
+                    ${log.globalNotes ? `
+                        <div class="bg-rose-50/50 p-2.5 rounded-xl border border-rose-100">
+                            <span class="text-[10px] font-bold text-rose-600 uppercase">General Notes:</span>
+                            <p class="text-slate-700 mt-0.5">${log.globalNotes}</p>
+                        </div>
+                    ` : ''}
+                </div>
+            `).join('');
+            lucide.createIcons();
+        }
+
+        // Medication Tracker
+        function addMedication() {
+            const name = document.getElementById('medName').value.trim();
+            const dosage = document.getElementById('medDosage').value.trim();
+            const time = document.getElementById('medTime').value;
+
+            if (!name) return;
+            state.medications.push({ id: Date.now(), name, dosage, time });
+            localStorage.setItem('care_meds', JSON.stringify(state.medications));
+            document.getElementById('medName').value = '';
+            document.getElementById('medDosage').value = '';
+            renderMeds();
+        }
+
+        function renderMeds() {
+            const list = document.getElementById('medsList');
+            if (state.medications.length === 0) {
+                list.innerHTML = `<p class="text-xs text-slate-400">No medications added yet.</p>`;
+                return;
+            }
+            list.innerHTML = state.medications.map(m => `
+                <div class="flex items-center justify-between bg-slate-50 p-3 rounded-xl border border-slate-200 text-xs">
+                    <div>
+                        <p class="font-bold text-slate-700">${m.name} <span class="font-normal text-slate-500">(${m.dosage})</span></p>
+                        <p class="text-[10px] text-slate-400">${m.time ? 'Scheduled: ' + m.time : 'Daily'}</p>
+                    </div>
+                    <button onclick="removeMed(${m.id})" class="text-slate-400 hover:text-rose-500"><i data-lucide="x" class="w-4 h-4"></i></button>
+                </div>
+            `).join('');
+            lucide.createIcons();
+        }
+
+        function removeMed(id) {
+            state.medications = state.medications.filter(m => m.id !== id);
+            localStorage.setItem('care_meds', JSON.stringify(state.medications));
+            renderMeds();
+        }
+
+        // Export Functions
+        function exportCSV() {
+            if (!state.logs.length) return showToast("No logs to export!");
+            let csv = "Date,Time,Symptom Name,Symptom Time,Severity,Symptom Note,General Notes\n";
+            state.logs.forEach(l => {
+                if (l.symptoms.length > 0) {
+                    l.symptoms.forEach(s => {
+                        csv += `"${l.date}","${l.time}","${s.name}","${s.time}","${s.severity}","${(s.note||'').replace(/"/g, '""')}","${(l.globalNotes||'').replace(/"/g, '""')}"\n`;
+                    });
+                } else {
+                    csv += `"${l.date}","${l.time}","N/A","N/A","N/A","N/A","${(l.globalNotes||'').replace(/"/g, '""')}"\n`;
+                }
+            });
+            const blob = new Blob([csv], { type: 'text/csv' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `care_health_report_${new Date().toISOString().slice(0,10)}.csv`;
+            a.click();
+        }
+
+        function exportJSON() {
+            const blob = new Blob([JSON.stringify(state.logs, null, 2)], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `care_logs_${new Date().toISOString().slice(0,10)}.json`;
+            a.click();
+        }
+
+        function deleteLog(id) {
+            state.logs = state.logs.filter(l => l.id !== id);
+            localStorage.setItem('care_logs', JSON.stringify(state.logs));
+            renderHistory();
+        }
+
+        // Analytics / Insights Chart
+        let trendChart;
+        function renderInsights() {
+            const ctx = document.getElementById('trendChart').getContext('2d');
+            const recent = state.logs.slice(0, 7).reverse();
+            const labels = recent.map(l => l.date);
+            const counts = recent.map(l => l.symptoms.length);
+
+            if (trendChart) trendChart.destroy();
+            trendChart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'Symptom Count',
+                        data: counts,
+                        backgroundColor: 'rgba(244, 63, 94, 0.6)',
+                        borderColor: '#f43f5e',
+                        borderWidth: 1,
+                        borderRadius: 6
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } }
+                }
+            });
+
+            // Top symptoms
+            const symMap = {};
+            state.logs.forEach(l => {
+                l.symptoms.forEach(s => symMap[s.name] = (symMap[s.name] || 0) + 1);
+            });
+            const sorted = Object.entries(symMap).sort((a,b) => b[1] - a[1]).slice(0, 5);
+            document.getElementById('frequentSymptoms').innerHTML = sorted.length ? sorted.map(([k,v]) => `
+                <div class="flex justify-between items-center bg-slate-50 p-2 rounded-lg">
+                    <span>${k}</span>
+                    <span class="font-bold text-rose-500">${v} times</span>
+                </div>
+            `).join('') : '<p class="text-slate-400">Log entries to see frequency insights.</p>';
+        }
+
+        function showToast(msg) {
+            const toast = document.getElementById('toast');
+            document.getElementById('toastMsg').innerText = msg;
+            toast.classList.remove('opacity-0', 'pointer-events-none');
+            toast.classList.add('opacity-100');
+            setTimeout(() => toast.classList.add('opacity-0', 'pointer-events-none'), 2200);
+        }
+    </script>
+</body>
+</html>
+```
